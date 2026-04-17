@@ -6,15 +6,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"
-TFLITE_MODEL_PATH = os.path.join(DATASET_DIR, "cnn_lepidoptera_int8.tflite")
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
+MODEL_STEM = os.environ.get("MODEL_STEM", "cnn_lepidoptera")
+
+TFLITE_MODEL_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_int8.tflite")
 X_TEST_PATH = os.path.join(DATASET_DIR, "X_test_uint8.npy")
 Y_TEST_PATH = os.path.join(DATASET_DIR, "y_test.npy")
 CLASSES_PATH = os.path.join(DATASET_DIR, "classes.npy")
 
-REPORT_PATH = os.path.join(DATASET_DIR, "tflite_classification_report.txt")
-CONFUSION_NPY_PATH = os.path.join(DATASET_DIR, "tflite_confusion_matrix.npy")
-CONFUSION_PNG_PATH = os.path.join(DATASET_DIR, "tflite_confusion_matrix_top30.png")
+REPORT_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_classification_report.txt")
+CONFUSION_NPY_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_confusion_matrix.npy")
+CONFUSION_PNG_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_confusion_matrix_top30.png")
 
 TOP_N_CONFUSION = 30  # 可視化する上位クラス数
 

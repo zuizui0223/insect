@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
 X_PATH = os.path.join(DATASET_DIR, "X_uint8.npy")
 Y_PATH = os.path.join(DATASET_DIR, "y_species.npy")
 

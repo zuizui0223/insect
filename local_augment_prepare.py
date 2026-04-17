@@ -3,7 +3,7 @@ import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
 X_TRAIN_PATH = os.path.join(DATASET_DIR, "X_train_uint8.npy")
 X_TEST_PATH = os.path.join(DATASET_DIR, "X_test_uint8.npy")
 Y_TRAIN_PATH = os.path.join(DATASET_DIR, "y_train.npy")

@@ -4,7 +4,7 @@ import pandas as pd
 from PIL import Image
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"   # 画像収集先フォルダ
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
 METADATA_CSV = os.path.join(DATASET_DIR, "metadata.csv")
 IMAGE_SIZE = (128, 128)
 

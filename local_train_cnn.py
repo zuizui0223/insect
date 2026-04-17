@@ -6,11 +6,14 @@ from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
+MODEL_STEM = os.environ.get("MODEL_STEM", "cnn_lepidoptera")
+
 IMAGE_SIZE = (128, 128)
 BATCH_SIZE = 32
 EPOCHS = 30
-MODEL_PATH = os.path.join(DATASET_DIR, "cnn_lepidoptera.keras")
+
+MODEL_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}.keras")
 
 # ===== データ読み込み =====
 X_TRAIN_PATH = os.path.join(DATASET_DIR, "X_train_uint8.npy")

@@ -4,13 +4,15 @@ import tensorflow as tf
 from tensorflow import keras
 
 # ===== 設定 =====
-DATASET_DIR = "inat_lepidoptera_japan"
-MODEL_PATH = os.path.join(DATASET_DIR, "cnn_lepidoptera.keras")
+DATASET_DIR = os.environ.get("DATASET_DIR", "inat_lepidoptera_japan")
+MODEL_STEM = os.environ.get("MODEL_STEM", "cnn_lepidoptera")
+
+MODEL_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}.keras")
 X_TRAIN_PATH = os.path.join(DATASET_DIR, "X_train_uint8.npy")
 CLASSES_PATH = os.path.join(DATASET_DIR, "classes.npy")
 
-TFLITE_INT8_PATH = os.path.join(DATASET_DIR, "cnn_lepidoptera_int8.tflite")
-TFLITE_FLOAT_PATH = os.path.join(DATASET_DIR, "cnn_lepidoptera_float32.tflite")
+TFLITE_INT8_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_int8.tflite")
+TFLITE_FLOAT_PATH = os.path.join(DATASET_DIR, f"{MODEL_STEM}_float32.tflite")
 LABELS_TXT_PATH = os.path.join(DATASET_DIR, "labels.txt")
 
 REPRESENTATIVE_SAMPLES = 200
