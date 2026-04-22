@@ -3,6 +3,19 @@ from datetime import datetime
 import os
 import time
 
+# =========================
+# display env for cv2.imshow on Raspberry Pi
+# =========================
+os.environ.setdefault("DISPLAY", ":0")
+os.environ.setdefault("XAUTHORITY", "/home/zuizui0223/.Xauthority")
+os.environ.setdefault("XDG_RUNTIME_DIR", "/tmp/qt-runtime-zuizui0223")
+os.environ.pop("QT_PLUGIN_PATH", None)
+os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
+
+# runtime dir を自動作成
+os.makedirs(os.environ["XDG_RUNTIME_DIR"], exist_ok=True)
+os.chmod(os.environ["XDG_RUNTIME_DIR"], 0o700)
+
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -14,10 +27,14 @@ except ImportError:
     from ai_edge_litert.interpreter import Interpreter
 
 
+
+CONVERT_RGB_TO_BGR = False
+
+
+
 # =========================
 # paths
 # =========================
-
 FLOWER_MODEL_PATH = "/home/zuizui0223/visit_detect/cirsium_best.pt"
 INSECT3_MODEL_PATH = "/home/zuizui0223/visit_detect/insect3_classifier.tflite"
 INSECT3_CLASSES_PATH = "/home/zuizui0223/visit_detect/classes.npy"
@@ -29,7 +46,6 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # =========================
 # camera / display
 # =========================
-
 CAM_SIZE = (640, 480)
 SHOW_WINDOWS = True
 SAVE_FPS = 20.0
@@ -38,7 +54,6 @@ SAVE_FPS = 20.0
 # =========================
 # flower YOLO settings
 # =========================
-
 FLOWER_CONF_THRES = 0.65
 FLOWER_EXPAND_RATIO = 0.15
 FLOWER_DETECT_EVERY = 10
@@ -55,7 +70,6 @@ MAX_FLOWER_ASPECT = 2.5
 # =========================
 # motion settings
 # =========================
-
 WARMUP_FRAMES = 30
 MOTION_RATIO_THRES = 0.008
 MIN_AREA = 80
@@ -64,19 +78,24 @@ MIN_AREA = 80
 # =========================
 # insect classifier settings
 # =========================
-
 CLASSIFIER_IMAGE_SIZE = (128, 128)
 INSECT_CONF_THRES = 0.75
 CLASSIFY_EVERY = 3
 CLASSIFIER_ACTIVE_SEC = 2.0
 
-STOP_AFTER_NO_INSECT_SEC = 2.0
+# 昆虫がいなくなった判定
+STOP_AFTER_NO_INSECT_SEC = 3.0
+
+# 録画開始後の最大秒数
+MAX_RECORD_SEC = 60.0
+
+# 止まっても1秒だけ追跡扱い
+TRACK_AFTER_DETECTION_SEC = 1.0
 
 
 # =========================
 # load models
 # =========================
-
 if not os.path.exists(FLOWER_MODEL_PATH):
     raise FileNotFoundError(f"Flower YOLO model not found: {FLOWER_MODEL_PATH}")
 
@@ -101,12 +120,12 @@ insect_classes = np.load(INSECT3_CLASSES_PATH, allow_pickle=True)
 print("[INFO] insect classes:", insect_classes)
 print("[INFO] TFLite input:", input_details)
 print("[INFO] TFLite output:", output_details)
+print("[INFO] CONVERT_RGB_TO_BGR:", CONVERT_RGB_TO_BGR)
 
 
 # =========================
 # camera
 # =========================
-
 print("[INFO] Starting Picamera2...")
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(
@@ -116,16 +135,19 @@ picam2.configure(config)
 picam2.start()
 time.sleep(2.0)
 
-frame = picam2.capture_array()
-H, W = frame.shape[:2]
+frame_raw = picam2.capture_array()
+if CONVERT_RGB_TO_BGR:
+    frame = cv2.cvtColor(frame_raw, cv2.COLOR_RGB2BGR)
+else:
+    frame = frame_raw.copy()
 
+H, W = frame.shape[:2]
 print(f"[INFO] Camera size: {W} x {H}")
 
 
 # =========================
 # background subtractor
 # =========================
-
 back_sub = cv2.createBackgroundSubtractorMOG2(
     history=120,
     varThreshold=40,
@@ -139,7 +161,6 @@ kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
 # =========================
 # state
 # =========================
-
 frame_count = 0
 
 last_flower_det = None
@@ -153,16 +174,19 @@ last_insect_time = 0.0
 recording = False
 writer = None
 current_video_path = None
+record_start_time = None
 
 last_pred_label = "none"
 last_pred_conf = 0.0
 last_crop_box = None
 
+tracked_box = None
+tracked_until = 0.0
+
 
 # =========================
 # functions
 # =========================
-
 def detect_flower(frame):
     results = flower_model.predict(
         source=frame,
@@ -229,6 +253,12 @@ def reset_insect_state():
     last_pred_label = "none"
     last_pred_conf = 0.0
     last_crop_box = None
+
+
+def reset_tracking_state():
+    global tracked_box, tracked_until
+    tracked_box = None
+    tracked_until = 0.0
 
 
 def calc_motion_in_roi(frame, roi_box):
@@ -330,8 +360,8 @@ def classify_crop(frame, crop_box):
     return label, conf
 
 
-def start_recording(vis_frame):
-    global writer, recording, current_video_path
+def start_recording():
+    global writer, recording, current_video_path, record_start_time
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     current_video_path = OUTPUT_DIR / f"insect3_event_{timestamp}.mp4"
@@ -345,11 +375,12 @@ def start_recording(vis_frame):
     )
 
     recording = True
+    record_start_time = time.time()
     print(f"[START] {last_pred_label} {last_pred_conf:.2f} recording: {current_video_path}")
 
 
 def stop_recording(reason=""):
-    global writer, recording, current_video_path
+    global writer, recording, current_video_path, record_start_time
 
     if writer is not None:
         writer.release()
@@ -359,6 +390,7 @@ def stop_recording(reason=""):
     writer = None
     recording = False
     current_video_path = None
+    record_start_time = None
 
 
 def draw_text(vis, text, y, color=(255, 255, 255)):
@@ -367,7 +399,7 @@ def draw_text(vis, text, y, color=(255, 255, 255)):
         text,
         (20, y),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.75,
+        0.72,
         color,
         2,
         cv2.LINE_AA
@@ -377,13 +409,15 @@ def draw_text(vis, text, y, color=(255, 255, 255)):
 # =========================
 # main loop
 # =========================
-
 try:
     print("[INFO] Main loop started. Press Ctrl+C to stop.")
 
     while True:
-        frame = picam2.capture_array()
-        
+        frame_raw = picam2.capture_array()
+        if CONVERT_RGB_TO_BGR:
+            frame = cv2.cvtColor(frame_raw, cv2.COLOR_RGB2BGR)
+        else:
+            frame = frame_raw.copy()
 
         frame_count += 1
         now = time.time()
@@ -401,7 +435,6 @@ try:
 
                 if flower_stable_count >= FLOWER_STABLE_REQUIRED:
                     last_flower_det = pending_flower_det
-
             else:
                 flower_missing_count += 1
                 flower_stable_count = 0
@@ -410,6 +443,7 @@ try:
                 if flower_missing_count >= MAX_FLOWER_MISSING:
                     last_flower_det = None
                     reset_insect_state()
+                    reset_tracking_state()
 
                     if recording:
                         stop_recording(reason="[flower lost]")
@@ -421,6 +455,8 @@ try:
 
             if recording:
                 stop_recording(reason="[no flower]")
+                reset_insect_state()
+                reset_tracking_state()
 
             if SHOW_WINDOWS:
                 draw_text(vis, "flower not detected: recording disabled", 30, (0, 0, 255))
@@ -439,6 +475,7 @@ try:
         motion_triggered = False
         classifier_active = False
         insect_confirmed = False
+        tracking_active = False
 
         fx1, fy1, fx2, fy2 = last_flower_det["bbox"]
         rx1, ry1, rx2, ry2 = last_flower_det["roi"]
@@ -457,6 +494,7 @@ try:
 
         if not classifier_active and not recording:
             reset_insect_state()
+            reset_tracking_state()
 
         # 4. classify only when motion-triggered
         if classifier_active and frame_count % CLASSIFY_EVERY == 1 and len(moving_boxes) > 0:
@@ -468,41 +506,67 @@ try:
             last_pred_label = label
             last_pred_conf = conf
 
-        # 5. record only if insect classification is confident
-        if last_pred_conf >= INSECT_CONF_THRES:
+            if conf >= INSECT_CONF_THRES:
+                insect_confirmed = True
+                last_insect_time = now
+
+                tracked_box = crop_box
+                tracked_until = now + TRACK_AFTER_DETECTION_SEC
+
+                if not recording:
+                    start_recording()
+
+        # 5. 1秒だけ簡易追跡
+        if tracked_box is not None and now <= tracked_until:
+            tracking_active = True
             insect_confirmed = True
-            last_insect_time = now
 
-            if not recording:
-                start_recording(vis)
-
-        # 6. draw only when display or recording
+        # 6. draw
         if SHOW_WINDOWS or recording:
+            # flower bbox = green
             cv2.rectangle(vis, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+
+            # ROI = red
             cv2.rectangle(vis, (rx1, ry1), (rx2, ry2), (0, 0, 255), 2)
 
+            # moving blobs = yellow
             for mb in moving_boxes:
                 mx1, my1, mx2, my2, area = mb
                 cv2.rectangle(vis, (mx1, my1), (mx2, my2), (0, 255, 255), 1)
 
+            # last classified crop = blue
             if last_crop_box is not None:
                 cx1, cy1, cx2, cy2 = last_crop_box
                 cv2.rectangle(vis, (cx1, cy1), (cx2, cy2), (255, 0, 0), 2)
+
+            # tracked box = magenta
+            if tracked_box is not None and now <= tracked_until:
+                tx1, ty1, tx2, ty2 = tracked_box
+                cv2.rectangle(vis, (tx1, ty1), (tx2, ty2), (255, 0, 255), 2)
 
             draw_text(vis, f"flower {fconf:.2f} area {farea:.3f} asp {faspect:.2f}", 30)
             draw_text(vis, f"motion_ratio {motion_ratio:.4f}", 60)
             draw_text(vis, f"motion_trigger {motion_triggered}", 90, (0, 255, 255) if motion_triggered else (180, 180, 180))
             draw_text(vis, f"classifier_active {classifier_active}", 120, (0, 255, 255) if classifier_active else (180, 180, 180))
             draw_text(vis, f"pred {last_pred_label} {last_pred_conf:.2f}", 150, (255, 0, 0) if insect_confirmed else (180, 180, 180))
-            draw_text(vis, f"recording {recording}", 180, (0, 0, 255) if recording else (180, 180, 180))
+            draw_text(vis, f"tracking_active {tracking_active}", 180, (255, 0, 255) if tracking_active else (180, 180, 180))
+            draw_text(vis, f"recording {recording}", 210, (0, 0, 255) if recording else (180, 180, 180))
 
-        # 7. write video
+        # 7. write video / stop conditions
         if recording and writer is not None:
             writer.write(vis)
 
-            if now - last_insect_time > STOP_AFTER_NO_INSECT_SEC:
+            # 最大60秒
+            if record_start_time is not None and (now - record_start_time > MAX_RECORD_SEC):
+                stop_recording(reason="[max 60 sec]")
+                reset_insect_state()
+                reset_tracking_state()
+
+            # 新しい昆虫検出がなく、追跡1秒も切れたら停止
+            elif (now - last_insect_time > STOP_AFTER_NO_INSECT_SEC) and (now > tracked_until):
                 stop_recording(reason="[no insect]")
                 reset_insect_state()
+                reset_tracking_state()
 
         if SHOW_WINDOWS:
             cv2.imshow("flower motion -> insect3 classifier -> record", vis)
