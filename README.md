@@ -81,7 +81,12 @@ Target and organism models are retained as optional ablations and applications. 
 - `docs/NOISE_FIRST_METHOD.md` — the conceptual framework.
 - `docs/NOISEBENCH_PROTOCOL.md` — controlled perturbation protocol and endpoints.
 - `docs/IMX500_DEPLOYMENT.md` — IMX500 as a scene-observability sensor.
-- `legacy/` — original prototype scripts, organised as runtime, target detection, recognition, and data utilities.
+- `docs/REPOSITORY_OVERVIEW.md` — index of every doc in `docs/`, plus a one-page map of the whole repository.
+- `analysis/` — scripts that turn a recorded event ledger and audit annotations into observability/error estimates; see `analysis/README.md`.
+- `configs/` — named baseline and NoiseBench pipeline configurations (`.toml`).
+- `models/` — trained weights for the legacy Cirsium YOLO target-detection baseline; see `models/README.md`.
+- `legacy/` — original prototype scripts, organised as runtime, target detection, recognition, and data utilities; see `legacy/README.md`.
+- `tests/` — pytest suite for the `interaction_sensing` package.
 
 ## Quick start
 
