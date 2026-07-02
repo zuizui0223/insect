@@ -19,6 +19,7 @@ dev = ["pytest>=7.0", "ruff>=0.4"]
 
 [project.scripts]
 interaction-motion-baseline = "interaction_sensing.cli.run_motion_baseline:main"
+interaction-sim-benchmark = "interaction_sensing.cli.run_synthetic_benchmark:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
