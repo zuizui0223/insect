@@ -1,4 +1,4 @@
-"""Error-aware sensing of target--actor interactions in natural scenes."""
+"""Noise-first, error-aware sensing for complex natural scenes."""
 
 from .domain import (
     AuditRecord,
@@ -10,6 +10,13 @@ from .domain import (
     SceneState,
     TargetSpec,
 )
+from .noise import (
+    NoiseFirstPolicy,
+    NoiseObservation,
+    NoiseSource,
+    ObservabilityDecision,
+    ObservabilityState,
+)
 
 __all__ = [
     "AuditRecord",
@@ -18,6 +25,11 @@ __all__ = [
     "ErrorClass",
     "InteractionEvent",
     "InteractionState",
+    "NoiseFirstPolicy",
+    "NoiseObservation",
+    "NoiseSource",
+    "ObservabilityDecision",
+    "ObservabilityState",
     "SceneState",
     "TargetSpec",
 ]
