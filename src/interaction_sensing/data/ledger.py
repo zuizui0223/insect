@@ -125,6 +125,10 @@ class EventLedger:
         )
         self.connection.commit()
 
+    def fetch_targets(self) -> list[dict[str, Any]]:
+        rows = self.connection.execute("SELECT payload_json FROM targets ORDER BY target_id").fetchall()
+        return [json.loads(row["payload_json"]) for row in rows]
+
     def fetch_events(self, *, target_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT payload_json FROM events"
         params: tuple[Any, ...] = ()
@@ -133,6 +137,20 @@ class EventLedger:
             params = (target_id,)
         query += " ORDER BY start_time"
         rows = self.connection.execute(query, params).fetchall()
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def fetch_scene_states(self, *, target_id: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT payload_json FROM scene_states"
+        params: tuple[Any, ...] = ()
+        if target_id is not None:
+            query += " WHERE target_id = ?"
+            params = (target_id,)
+        query += " ORDER BY timestamp"
+        rows = self.connection.execute(query, params).fetchall()
+        return [json.loads(row["payload_json"]) for row in rows]
+
+    def fetch_audits(self) -> list[dict[str, Any]]:
+        rows = self.connection.execute("SELECT payload_json FROM audits ORDER BY sampled_at").fetchall()
         return [json.loads(row["payload_json"]) for row in rows]
 
     def close(self) -> None:

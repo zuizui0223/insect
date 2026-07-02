@@ -60,6 +60,24 @@ class EventSegmenter:
         self._last_seen[key] = timestamp
         return EventUpdate(active=event)
 
+    def close_key(
+        self,
+        *,
+        target_id: str,
+        actor_track_id: str | None,
+        end_time: datetime | None = None,
+    ) -> InteractionEvent | None:
+        """Force-close one active event, for capture guards or source shutdown."""
+
+        key = (target_id, actor_track_id)
+        event = self._active.pop(key, None)
+        last_seen = self._last_seen.pop(key, None)
+        if event is None:
+            return None
+        event.end_time = end_time or last_seen or event.start_time
+        event.state = InteractionState.DEPARTED
+        return event
+
     def close_quiet(self, *, now: datetime) -> list[InteractionEvent]:
         """Close events that were not refreshed during the quiet interval."""
 
@@ -67,19 +85,15 @@ class EventSegmenter:
         for key, last_seen in list(self._last_seen.items()):
             if now - last_seen <= self.quiet_period:
                 continue
-            event = self._active.pop(key)
-            self._last_seen.pop(key)
-            event.end_time = last_seen
-            event.state = InteractionState.DEPARTED
-            ended.append(event)
+            event = self.close_key(target_id=key[0], actor_track_id=key[1], end_time=last_seen)
+            if event is not None:
+                ended.append(event)
         return ended
 
     def close_all(self, *, now: datetime) -> list[InteractionEvent]:
         ended: list[InteractionEvent] = []
-        for key, event in list(self._active.items()):
-            event.end_time = self._last_seen[key]
-            event.state = InteractionState.DEPARTED
-            ended.append(event)
-        self._active.clear()
-        self._last_seen.clear()
+        for target_id, actor_track_id in list(self._active):
+            event = self.close_key(target_id=target_id, actor_track_id=actor_track_id, end_time=now)
+            if event is not None:
+                ended.append(event)
         return ended

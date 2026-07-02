@@ -39,20 +39,61 @@ A target can be a flower, inflorescence, fruit, leaf, nest entrance, bait statio
 
 The first nine functions are the core method. Flower detection, Cirsium-specific models, and three-class insect recognition are optional plugins retained as prototypes.
 
-## What is implemented now
+## Implemented baseline: manual target + motion-only capture
 
-The reusable package provides the first, deliberately small backbone:
+The first runnable baseline connects the prior motion detector to the new research architecture:
 
-- taxon-agnostic target, candidate, scene-state, event, and audit-record data contracts;
-- manual target and nested-zone specification;
-- local MOG2 motion extraction as a reproducible baseline;
-- target assignment that retains ambiguous neighbouring targets rather than forcing a false certainty;
-- interaction-event segmentation and a pre-event ring buffer;
-- independent random audit sampling;
-- SQLite event ledger;
-- target/time-aware audit matching, error summaries, and condition-stratified observability summaries.
+```text
+manual target + nested zones
+  -> fixed local ROI
+  -> MOG2 motion candidates
+  -> geometric interaction state
+  -> event segmentation + raw pre-event clip
+  -> SQLite event ledger
+  -> independent random raw audit clips
+  -> later truth matching and observability analysis
+```
 
-The legacy scripts are retained as explicit ablation baselines:
+A motion event is **not** treated as proof of an ecological interaction. Its event state, raw clip, target ID, scene state, and capture path are stored so that it can later be audited as true focal interaction, near-target pass, wrong-target interaction, plant-motion false event, missed event, split, merge, or unknown.
+
+### Quick start
+
+```bash
+python -m pip install -e ".[runtime,dev]"
+
+interaction-motion-only \
+  --source path/to/video.mp4 \
+  --output-dir runs/demo_001 \
+  --target-id flower_001 \
+  --target-type flower \
+  --core-zone 420,180,220,220 \
+  --access-zone 470,230,100,100 \
+  --display
+```
+
+`--core-zone` and optional `--access-zone` use `x,y,width,height` pixel coordinates from the first frame. The wider context zone is created automatically using `configs/baselines/motion_only.toml`.
+
+This produces:
+
+```text
+runs/demo_001/
+  run_manifest.json
+  events.sqlite
+  events/                 # raw clips started by the motion baseline
+  audits/                 # raw random clips sampled independently of triggers
+```
+
+Export the ledger before annotation or analysis:
+
+```bash
+python analysis/00_export_ledger.py \
+  --ledger runs/demo_001/events.sqlite \
+  --output-dir runs/demo_001/exports
+```
+
+## Legacy ablation baselines
+
+The historical scripts are retained as explicit comparison conditions:
 
 ```text
 motion only
@@ -60,22 +101,17 @@ motion -> detector
 motion -> classifier
 ```
 
+They live under `legacy/` and are not the public API.
+
 ## Repository map
 
 - `src/interaction_sensing/` — reusable package for targets, candidates, interaction events, audit capture, ledgers, and evaluation.
-- `analysis/` — audit matching and condition-specific observability analysis skeleton.
+- `analysis/` — ledger export, audit matching, and condition-specific observability analysis.
 - `configs/baselines/` — versioned settings for the historical ablation pipelines.
-- `legacy/` — original prototype scripts, now organised as runtime, target-detection, recognition, and data utilities.
+- `legacy/` — original prototype scripts, organised as runtime, target-detection, recognition, and data utilities.
 - `docs/FUNCTION_INVENTORY.md` — current functions and their role in the new system.
 - `docs/ERROR_TAXONOMY.md` — error classes and minimum audit-annotation fields.
 - `docs/TARGET_ARCHITECTURE.md` — migration plan and target package layout.
-
-## Quick start
-
-```bash
-python -m pip install -e ".[runtime,analysis,dev]"
-pytest
-```
 
 ## Research direction
 
@@ -89,4 +125,4 @@ The method will be evaluated by its ability to recover ecological interaction es
 
 ## Status
 
-This is an active research prototype. The `refactor/interaction-sensing-architecture` branch contains the initial package and analysis skeleton; the default branch still contains the historical flat-script layout until this refactor is reviewed and merged.
+The manual-target motion-only baseline is runnable. It deliberately uses a fixed target coordinate system, so wind-driven target movement remains a measurable error source rather than a solved problem. The next technical comparison is target-relative stabilisation versus this fixed-ROI baseline under controlled and field wind conditions.
