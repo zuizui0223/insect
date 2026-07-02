@@ -32,6 +32,13 @@ from .temporal_risk_benchmark import (
     run_temporal_risk_benchmark,
     write_temporal_risk_benchmark,
 )
+from .temporal_risk_evaluation import (
+    TemporalRiskEvaluationConfig,
+    TemporalRiskFailureMapCell,
+    TemporalRiskPairedEffect,
+    evaluate_temporal_risk_results,
+    write_temporal_risk_evaluation,
+)
 from .visual_benchmark import (
     VisualBenchmarkConfig,
     VisualBenchmarkResult,
@@ -62,8 +69,11 @@ __all__ = [
     "TemporalRiskBenchmarkConfig",
     "TemporalRiskBenchmarkResult",
     "TemporalRiskCalibration",
+    "TemporalRiskEvaluationConfig",
+    "TemporalRiskFailureMapCell",
     "TemporalRiskModel",
     "TemporalRiskModelConfig",
+    "TemporalRiskPairedEffect",
     "TemporalRiskPolicy",
     "TemporalRiskRun",
     "TemporalRiskTrainingSummary",
@@ -75,6 +85,7 @@ __all__ = [
     "VisualWorldConfig",
     "estimate_global_shift",
     "evaluate_latent_results",
+    "evaluate_temporal_risk_results",
     "extract_visual_features",
     "fit_temporal_risk_model",
     "run_benchmark",
@@ -86,5 +97,6 @@ __all__ = [
     "write_latent_benchmark",
     "write_latent_evaluation",
     "write_temporal_risk_benchmark",
+    "write_temporal_risk_evaluation",
     "write_visual_benchmark",
 ]
