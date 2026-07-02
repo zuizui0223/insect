@@ -1,0 +1,15 @@
+pipeline_id = "motion_classifier_v1"
+base = "motion_only_v1"
+
+[verification]
+kind = "classifier"
+model_path = "models/optional_actor_classifier.tflite"
+labels_path = "models/optional_actor_labels.txt"
+confidence_threshold = 0.75
+active_seconds_after_motion = 2.0
+run_every_n_frames = 3
+
+[recognition]
+# Recognition is interpreted as an optional attribute, not proof of interaction.
+store_label = true
+store_confidence = true
