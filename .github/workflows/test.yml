@@ -21,4 +21,11 @@ jobs:
       - name: Install package and test tools
         run: python -m pip install -e ".[dev]"
       - name: Run unit tests
-        run: pytest
+        shell: bash
+        run: |
+          pytest -q > pytest.log 2>&1 || {
+            status=$?
+            cat pytest.log
+            exit "$status"
+          }
+          cat pytest.log
