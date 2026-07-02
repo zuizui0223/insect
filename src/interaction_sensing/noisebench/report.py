@@ -77,9 +77,13 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     if not rows:
         path.write_text("", encoding="utf-8")
         return
-    fields = list(rows[0].keys())
+    fields: list[str] = []
+    for row in rows:
+        for field in row:
+            if field not in fields:
+                fields.append(field)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="raise")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -103,7 +107,7 @@ def _render_protocol(plan: NoiseBenchPlan) -> str:
         f"- Single-disturbance scenarios: {single_conditions}",
         f"- Mixed-disturbance scenarios: {mixed_conditions}",
         f"- Replicates: {config.replicates}",
-        f"- Recording duration: {config.duration_seconds:.1f} seconds", 
+        f"- Recording duration: {config.duration_seconds:.1f} seconds",
         f"- Nominal frame rate: {config.frame_rate:.1f} fps",
         f"- Intensity levels: {', '.join(f'{value:.2f}' for value in config.intensities)}",
         "",
