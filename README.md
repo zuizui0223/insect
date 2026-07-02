@@ -50,7 +50,8 @@ The reusable package provides the first, deliberately small backbone:
 - interaction-event segmentation and a pre-event ring buffer;
 - independent random audit sampling;
 - SQLite event ledger;
-- target/time-aware audit matching, error summaries, and condition-stratified observability summaries.
+- target/time-aware audit matching, error summaries, and condition-stratified observability summaries;
+- a runnable motion-only baseline CLI that writes the new ledger format.
 
 The legacy scripts are retained as explicit ablation baselines:
 
@@ -77,6 +78,32 @@ python -m pip install -e ".[runtime,analysis,dev]"
 pytest
 ```
 
+## Run the motion-only baseline
+
+Use a manually defined target box. The runner does not need flower or insect models.
+
+```bash
+interaction-motion-baseline \
+  --source path/to/video.mp4 \
+  --target-id flower_001 \
+  --target-type flower \
+  --target-bbox 420 180 720 520 \
+  --access-bbox 520 260 620 360 \
+  --ledger runs/motion_baseline/events.sqlite \
+  --clips-dir runs/motion_baseline/clips \
+  --write-clips \
+  --audit-probability 0.05 \
+  --audit-window-seconds 60
+```
+
+The output is not a biological conclusion yet. It is a structured record of:
+
+- target metadata;
+- motion-triggered candidate interaction events;
+- event clips, if requested;
+- random audit clips, if requested;
+- an SQLite ledger for later human truth matching and error analysis.
+
 ## Research direction
 
 The method will be evaluated by its ability to recover ecological interaction estimates, not only image-level accuracy. Key outputs include:
@@ -89,4 +116,4 @@ The method will be evaluated by its ability to recover ecological interaction es
 
 ## Status
 
-This is an active research prototype. The `refactor/interaction-sensing-architecture` branch contains the initial package and analysis skeleton; the default branch still contains the historical flat-script layout until this refactor is reviewed and merged.
+This is an active research prototype. The `feature/motion-baseline-runner` branch turns the first baseline into a runnable logging pipeline. The default branch contains the package skeleton and organised legacy layout.

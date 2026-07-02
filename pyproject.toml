@@ -17,6 +17,9 @@ analysis = ["pandas>=2.0"]
 models = ["ultralytics>=8.0", "tensorflow>=2.12"]
 dev = ["pytest>=7.0", "ruff>=0.4"]
 
+[project.scripts]
+interaction-motion-baseline = "interaction_sensing.cli.run_motion_baseline:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
