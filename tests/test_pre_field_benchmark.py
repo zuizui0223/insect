@@ -1,3 +1,5 @@
+import pytest
+
 from interaction_sensing.evaluation import fit_audit_calibration
 from interaction_sensing.simulation import BenchmarkConfig, run_benchmark
 from interaction_sensing.sensing import relative_motion_magnitude
@@ -55,6 +57,6 @@ def test_audit_calibration_recovers_binary_truth_count() -> None:
     audit_rows = [(True, True)] * 8 + [(True, False)] * 2 + [(False, True)] + [(False, False)] * 9
     calibration = fit_audit_calibration(audit_rows)
     estimate = calibration.corrected_truth_count(total_windows=100, observed_positive_windows=38)
-    assert calibration.detection_probability == 0.8
-    assert calibration.false_positive_probability == 0.1
-    assert estimate == 40.0
+    assert calibration.detection_probability == pytest.approx(0.8)
+    assert calibration.false_positive_probability == pytest.approx(0.1)
+    assert estimate == pytest.approx(40.0)
