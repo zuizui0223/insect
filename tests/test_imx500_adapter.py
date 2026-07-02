@@ -57,7 +57,7 @@ def test_roi_controller_only_updates_after_meaningful_change() -> None:
 
 
 def test_ssd_decoder_converts_coords_filters_confidence_and_labels() -> None:
-    decoder = SSDDetectionDecoder(confidence_threshold=0.5, labels={1: "actor_candidate"})
+    decoder = SSDDetectionDecoder(confidence_threshold=0.5, labels={1: "hardware_probe_label"})
     detections = decoder.decode(
         outputs=[
             _BatchedTensor([[(10.0, 20.0, 30.0, 40.0), (0.0, 0.0, 5.0, 5.0)]]),
@@ -70,22 +70,22 @@ def test_ssd_decoder_converts_coords_filters_confidence_and_labels() -> None:
     )
     assert len(detections) == 1
     detection = detections[0]
-    assert detection.label == "actor_candidate"
+    assert detection.label == "hardware_probe_label"
     assert detection.bbox == BBox(10.0, 20.0, 40.0, 60.0)
     assert detection.confidence == pytest.approx(0.9)
 
 
-def test_imx500_detections_are_candidates_not_interaction_events() -> None:
+def test_optional_object_proposals_remain_candidates_not_events() -> None:
     record = IMX500InferenceRecord(
         timestamp=datetime(2026, 7, 2, tzinfo=timezone.utc),
-        model_path="models/actor.rpk",
-        model_role=ModelRole.ACTOR_PROPOSAL,
+        model_path="models/ablation.rpk",
+        model_role=ModelRole.OBJECT_PROPOSAL,
         inference_roi=SensorROI(100, 100, 300, 300),
-        detections=(IMX500Detection(BBox(110, 120, 130, 145), 1, 0.8, "actor_candidate"),),
+        detections=(IMX500Detection(BBox(110, 120, 130, 145), 1, 0.8, "object"),),
         frame_index=7,
     )
     candidates = detections_as_candidates(record)
     assert len(candidates) == 1
     assert candidates[0].objectness_score == pytest.approx(0.8)
-    assert candidates[0].metadata["model_role"] == "actor_proposal"
+    assert candidates[0].metadata["model_role"] == "object_proposal"
     assert candidates[0].metadata["source"] == "imx500"
