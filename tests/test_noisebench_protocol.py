@@ -1,5 +1,6 @@
 from interaction_sensing.noisebench import (
     NoiseBenchConfig,
+    NoiseBenchPlan,
     PerturbationKind,
     build_noisebench_plan,
     write_noisebench_plan,
@@ -34,10 +35,13 @@ def test_single_perturbation_has_known_error_hypothesis() -> None:
 
 def test_noisebench_writer_creates_preregistered_manifest_and_windows(tmp_path) -> None:
     plan = build_noisebench_plan(NoiseBenchConfig(replicates=1, intensities=(0.5,), include_mixed_disturbance=False))
-    outputs = write_noisebench_plan(tmp_path, plan)
+    stable = next(scenario for scenario in plan.scenarios if scenario.scenario_id == "stable-r1")
+    stable_first = NoiseBenchPlan(config=plan.config, scenarios=(stable, *[s for s in plan.scenarios if s != stable]))
+    outputs = write_noisebench_plan(tmp_path, stable_first)
     assert all(path.exists() for path in outputs.values())
     manifest = outputs["manifest"].read_text(encoding="utf-8")
     windows = outputs["windows"].read_text(encoding="utf-8")
     assert "target_agnostic" in manifest
+    assert "noise_source" in manifest
     assert "active_noise_sources" in windows
     assert "camera_shake" in manifest
