@@ -16,9 +16,9 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 from pathlib import Path
-from typing import Any, Iterable, Protocol, Sequence
+from typing import Any, Protocol, Sequence
 
-from interaction_sensing.domain import BBox
+from interaction_sensing.domain import BBox, Candidate
 
 
 class ModelRole(str, Enum):
@@ -116,6 +116,35 @@ class IMX500InferenceRecord:
             "kpi": self.kpi,
             "metadata": self.metadata,
         }
+
+
+def detections_as_candidates(record: IMX500InferenceRecord) -> list[Candidate]:
+    """Bridge sensor detections into the taxon-agnostic candidate layer.
+
+    The returned objects are deliberately only `Candidate`s. They must still be
+    assigned to a target and evaluated against interaction zones before entering
+    an event state machine.
+    """
+
+    return [
+        Candidate(
+            timestamp=record.timestamp,
+            bbox=detection.bbox,
+            relative_motion_score=0.0,
+            objectness_score=detection.confidence,
+            verifier_label=detection.label,
+            metadata={
+                "source": "imx500",
+                "model_path": record.model_path,
+                "model_role": record.model_role.value,
+                "category": detection.category,
+                "sensor_frame_index": record.frame_index,
+                "sensor_roi": None if record.inference_roi is None else record.inference_roi.to_dict(),
+                "kpi": record.kpi,
+            },
+        )
+        for detection in record.detections
+    ]
 
 
 class InferenceDecoder(Protocol):
