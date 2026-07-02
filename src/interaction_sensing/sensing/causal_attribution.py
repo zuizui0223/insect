@@ -126,8 +126,8 @@ class CausalAttributor:
     deleting potentially meaningful but confounded observations.
     """
 
-    def __init__(self, config: CausalAttributionConfig = CausalAttributionConfig()) -> None:
-        self.config = config
+    def __init__(self, config: CausalAttributionConfig | None = None) -> None:
+        self.config = config if config is not None else CausalAttributionConfig()
 
     def attribute(self, evidence: CausalAttributionEvidence) -> CausalAttribution:
         cfg = self.config
