@@ -1,12 +1,17 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import pytest
 
 from interaction_sensing.domain import BBox
 from interaction_sensing.plugins.imx500 import (
+    IMX500Detection,
+    IMX500InferenceRecord,
+    ModelRole,
     SSDDetectionDecoder,
     SensorROI,
     TargetAwareROIController,
+    detections_as_candidates,
 )
 
 
@@ -68,3 +73,19 @@ def test_ssd_decoder_converts_coords_filters_confidence_and_labels() -> None:
     assert detection.label == "actor_candidate"
     assert detection.bbox == BBox(10.0, 20.0, 40.0, 60.0)
     assert detection.confidence == pytest.approx(0.9)
+
+
+def test_imx500_detections_are_candidates_not_interaction_events() -> None:
+    record = IMX500InferenceRecord(
+        timestamp=datetime(2026, 7, 2, tzinfo=timezone.utc),
+        model_path="models/actor.rpk",
+        model_role=ModelRole.ACTOR_PROPOSAL,
+        inference_roi=SensorROI(100, 100, 300, 300),
+        detections=(IMX500Detection(BBox(110, 120, 130, 145), 1, 0.8, "actor_candidate"),),
+        frame_index=7,
+    )
+    candidates = detections_as_candidates(record)
+    assert len(candidates) == 1
+    assert candidates[0].objectness_score == pytest.approx(0.8)
+    assert candidates[0].metadata["model_role"] == "actor_proposal"
+    assert candidates[0].metadata["source"] == "imx500"
