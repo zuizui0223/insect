@@ -12,7 +12,7 @@ The central question is not only whether a camera can identify a flower or an in
 - split one interaction into multiple events, or
 - merge multiple visitors into one event.
 
-This repository is being reorganized around the functions needed to measure, explain, and eventually correct those errors.
+This repository is organised around the functions needed to measure, explain, and eventually correct those errors.
 
 ## Core principle
 
@@ -37,22 +37,22 @@ A target can be a flower, inflorescence, fruit, leaf, nest entrance, bait statio
 10. optional actor guild or taxon recognition
 ```
 
-The first nine functions are the core method. Flower detection, Cirsium-specific models, and three-class insect recognition are optional plugins that currently serve as prototypes.
+The first nine functions are the core method. Flower detection, Cirsium-specific models, and three-class insect recognition are optional plugins retained as prototypes.
 
-## What exists today
+## What is implemented now
 
-The legacy scripts already contain working prototypes for:
+The reusable package provides the first, deliberately small backbone:
 
-- detecting a focal flower and expanding it to a local region of interest;
-- periodically refreshing and stabilising a target detection;
-- detecting motion only inside a target region;
-- filtering small motion components and extracting moving candidate boxes;
-- cascading motion triggers into a heavier verifier;
-- recording only around detected candidate events;
-- running the system both on desktop OpenCV video input and Raspberry Pi Picamera2;
-- preparing iNaturalist image data, training classifiers, evaluating them, and converting them to TFLite.
+- taxon-agnostic target, candidate, scene-state, event, and audit-record data contracts;
+- manual target and nested-zone specification;
+- local MOG2 motion extraction as a reproducible baseline;
+- target assignment that retains ambiguous neighbouring targets rather than forcing a false certainty;
+- interaction-event segmentation and a pre-event ring buffer;
+- independent random audit sampling;
+- SQLite event ledger;
+- target/time-aware audit matching, error summaries, and condition-stratified observability summaries.
 
-The current implementation is intentionally retained as a legacy baseline for future ablation experiments:
+The legacy scripts are retained as explicit ablation baselines:
 
 ```text
 motion only
@@ -60,9 +60,26 @@ motion -> detector
 motion -> classifier
 ```
 
+## Repository map
+
+- `src/interaction_sensing/` — reusable package for targets, candidates, interaction events, audit capture, ledgers, and evaluation.
+- `analysis/` — audit matching and condition-specific observability analysis skeleton.
+- `configs/baselines/` — versioned settings for the historical ablation pipelines.
+- `legacy/` — original prototype scripts, now organised as runtime, target-detection, recognition, and data utilities.
+- `docs/FUNCTION_INVENTORY.md` — current functions and their role in the new system.
+- `docs/ERROR_TAXONOMY.md` — error classes and minimum audit-annotation fields.
+- `docs/TARGET_ARCHITECTURE.md` — migration plan and target package layout.
+
+## Quick start
+
+```bash
+python -m pip install -e ".[runtime,analysis,dev]"
+pytest
+```
+
 ## Research direction
 
-The method will be evaluated by its ability to recover ecological interaction estimates, not only by image-level accuracy. Key outputs include:
+The method will be evaluated by its ability to recover ecological interaction estimates, not only image-level accuracy. Key outputs include:
 
 - event recall and false-event rate;
 - wrong-target attribution rate;
@@ -70,12 +87,6 @@ The method will be evaluated by its ability to recover ecological interaction es
 - how error changes with wind, light, target motion, target density, overlap, and background complexity;
 - whether corrected target-level interaction rates reproduce conclusions from continuous-video ground truth.
 
-## Repository map
-
-- `docs/FUNCTION_INVENTORY.md` — existing functions, their current scripts, and their role in the future system.
-- `docs/ERROR_TAXONOMY.md` — proposed error classes and the minimum event annotation scheme.
-- `docs/TARGET_ARCHITECTURE.md` — non-breaking refactor plan and target package layout.
-
 ## Status
 
-This is an active research prototype. The main branch contains historical experiment scripts. The `refactor/interaction-sensing-architecture` branch first documents the function-first architecture without changing runtime behavior.
+This is an active research prototype. The `refactor/interaction-sensing-architecture` branch contains the initial package and analysis skeleton; the default branch still contains the historical flat-script layout until this refactor is reviewed and merged.
