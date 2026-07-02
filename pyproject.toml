@@ -22,6 +22,7 @@ interaction-motion-baseline = "interaction_sensing.cli.run_motion_baseline:main"
 interaction-sim-benchmark = "interaction_sensing.cli.run_synthetic_benchmark:main"
 interaction-imx500-probe = "interaction_sensing.cli.probe_imx500:main"
 interaction-noisebench-plan = "interaction_sensing.cli.build_noisebench_plan:main"
+interaction-latent-benchmark = "interaction_sensing.cli.run_latent_disturbance_benchmark:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
