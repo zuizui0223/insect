@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "interaction-sensing"
 version = "0.1.0"
-description = "Error-aware target--actor interaction sensing for complex natural scenes"
+description = "Noise-first, error-aware sensing for complex natural scenes"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "zuizui0223"}]
@@ -21,6 +21,7 @@ dev = ["pytest>=7.0", "ruff>=0.4"]
 interaction-motion-baseline = "interaction_sensing.cli.run_motion_baseline:main"
 interaction-sim-benchmark = "interaction_sensing.cli.run_synthetic_benchmark:main"
 interaction-imx500-probe = "interaction_sensing.cli.probe_imx500:main"
+interaction-noisebench-plan = "interaction_sensing.cli.build_noisebench_plan:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
