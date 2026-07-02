@@ -46,12 +46,14 @@ The reusable package provides the first, deliberately small backbone:
 - taxon-agnostic target, candidate, scene-state, event, and audit-record data contracts;
 - manual target and nested-zone specification;
 - local MOG2 motion extraction as a reproducible baseline;
+- target-relative motion primitives;
 - target assignment that retains ambiguous neighbouring targets rather than forcing a false certainty;
 - interaction-event segmentation and a pre-event ring buffer;
 - independent random audit sampling;
 - SQLite event ledger;
 - target/time-aware audit matching, error summaries, and condition-stratified observability summaries;
-- a runnable motion-only baseline CLI that writes the new ledger format.
+- a runnable motion-only baseline CLI that writes the new ledger format;
+- a truth-labelled synthetic benchmark that stress-tests the method before fieldwork.
 
 The legacy scripts are retained as explicit ablation baselines:
 
@@ -63,10 +65,11 @@ motion -> classifier
 
 ## Repository map
 
-- `src/interaction_sensing/` — reusable package for targets, candidates, interaction events, audit capture, ledgers, and evaluation.
+- `src/interaction_sensing/` — reusable package for targets, candidates, interaction events, audit capture, ledgers, simulation, and evaluation.
 - `analysis/` — audit matching and condition-specific observability analysis skeleton.
 - `configs/baselines/` — versioned settings for the historical ablation pipelines.
 - `legacy/` — original prototype scripts, now organised as runtime, target-detection, recognition, and data utilities.
+- `docs/PREFIELD_VALIDATION.md` — the claim ladder and pre-field benchmark protocol.
 - `docs/FUNCTION_INVENTORY.md` — current functions and their role in the new system.
 - `docs/ERROR_TAXONOMY.md` — error classes and minimum audit-annotation fields.
 - `docs/TARGET_ARCHITECTURE.md` — migration plan and target package layout.
@@ -104,6 +107,35 @@ The output is not a biological conclusion yet. It is a structured record of:
 - random audit clips, if requested;
 - an SQLite ledger for later human truth matching and error analysis.
 
+## Run the pre-field synthetic benchmark
+
+The benchmark has complete ground truth and compares a fixed-context baseline
+against a target-relative, multi-target, ambiguity-preserving policy. It tests
+wind-driven target motion, neighbouring targets, pass-bys, shadows, tracker
+error, detection misses, and audit correction.
+
+```bash
+# Fast smoke test
+interaction-sim-benchmark --quick --output-dir runs/synthetic_quick
+
+# Default factorial benchmark
+interaction-sim-benchmark --output-dir runs/synthetic_benchmark
+```
+
+Every run writes:
+
+```text
+scenario_metrics.csv    # replicate-level outcomes
+benchmark_summary.csv   # policy × scenario means
+benchmark_report.md     # human-readable result table
+assumptions.json        # complete simulation settings
+```
+
+A synthetic win is a **mechanistic result**, not field validation. The method
+is useful only when its predicted advantage persists under non-zero tracker
+error and later transfers to controlled and field video. See
+`docs/PREFIELD_VALIDATION.md` for the evidence ladder.
+
 ## Research direction
 
 The method will be evaluated by its ability to recover ecological interaction estimates, not only image-level accuracy. Key outputs include:
@@ -116,4 +148,4 @@ The method will be evaluated by its ability to recover ecological interaction es
 
 ## Status
 
-This is an active research prototype. The `feature/motion-baseline-runner` branch turns the first baseline into a runnable logging pipeline. The default branch contains the package skeleton and organised legacy layout.
+This is an active research prototype. The `feature/synthetic-observability-benchmark` branch adds the first pre-field benchmark for the core methodological claim; the default branch contains the runnable motion baseline and organised legacy layout.
