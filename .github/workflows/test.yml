@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - refactor/**
+      - feature/**
 
 jobs:
   unit:
