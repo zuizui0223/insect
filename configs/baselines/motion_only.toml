@@ -1,0 +1,22 @@
+pipeline_id = "motion_only_v1"
+
+[target]
+source = "manual_or_detector"
+context_expand_ratio = 0.20
+
+[motion]
+history = 120
+var_threshold = 40.0
+min_area = 80
+resize_width = 320
+resize_height = 240
+foreground_ratio_threshold = 0.008
+
+[capture]
+quiet_seconds = 2.0
+pre_event_seconds = 3.0
+max_event_seconds = 60.0
+
+[audit]
+# Capture independently of event triggers.
+probability_per_audit_window = 0.05
