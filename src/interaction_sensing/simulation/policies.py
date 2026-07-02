@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from math import hypot
 from random import Random
 
 from interaction_sensing.domain import BBox, Candidate, TargetSpec
@@ -35,6 +34,9 @@ class FixedContextPolicy:
         initial = _target_spec(config, "focal", config.focal_center)
         self.fixed_context = initial.context_zone or initial.core_zone
 
+    def begin_frame(self, _: TargetFrame) -> None:
+        """Keep a shared policy interface; the fixed baseline has no update."""
+
     def decide(self, observation: CandidateObservation, _: TargetFrame) -> PolicyDecision:
         if self.fixed_context.contains(observation.center):
             return PolicyDecision(label="focal_context_event", focal_counted=True)
@@ -55,8 +57,16 @@ class TargetRelativeAttributionPolicy:
         self.config = config
         self.rng = Random(seed)
         self._previous_focal_estimate: tuple[float, float] | None = None
+        self._current_frame_index: int | None = None
+        self._focal_center: tuple[float, float] | None = None
+        self._neighbour_center: tuple[float, float] | None = None
+        self._focal_displacement: tuple[float, float] = (0.0, 0.0)
 
-    def decide(self, observation: CandidateObservation, target_frame: TargetFrame) -> PolicyDecision:
+    def begin_frame(self, target_frame: TargetFrame) -> None:
+        """Estimate target poses exactly once before evaluating frame candidates."""
+
+        if self._current_frame_index == target_frame.frame_index:
+            return
         focal_center = self._estimate_center(target_frame.focal_center)
         neighbour_center = self._estimate_center(target_frame.neighbour_center)
         if self._previous_focal_estimate is None:
@@ -67,13 +77,21 @@ class TargetRelativeAttributionPolicy:
                 focal_center[1] - self._previous_focal_estimate[1],
             )
         self._previous_focal_estimate = focal_center
+        self._current_frame_index = target_frame.frame_index
+        self._focal_center = focal_center
+        self._neighbour_center = neighbour_center
+        self._focal_displacement = focal_displacement
 
-        residual = relative_motion_magnitude(observation.displacement, focal_displacement)
+    def decide(self, observation: CandidateObservation, target_frame: TargetFrame) -> PolicyDecision:
+        self.begin_frame(target_frame)
+        assert self._focal_center is not None and self._neighbour_center is not None
+
+        residual = relative_motion_magnitude(observation.displacement, self._focal_displacement)
         if residual < self.config.relative_motion_threshold:
             return PolicyDecision(label="co_moving_or_static", focal_counted=False)
 
-        focal = _target_spec(self.config, "focal", focal_center)
-        neighbour = _target_spec(self.config, "neighbour", neighbour_center)
+        focal = _target_spec(self.config, "focal", self._focal_center)
+        neighbour = _target_spec(self.config, "neighbour", self._neighbour_center)
         timestamp = datetime(2026, 1, 1) + timedelta(seconds=observation.frame_index / self.config.frame_rate)
         candidate = Candidate(
             timestamp=timestamp,
