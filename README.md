@@ -2,77 +2,86 @@
 
 ## Purpose
 
-`interaction-sensing` is an experimental codebase for **error-aware ecological interaction sensing**.
+`interaction-sensing` is an experimental codebase for **noise-first, error-aware ecological sensing**.
 
-The central question is not only whether a camera can identify a flower or an insect. In complex natural scenes, many objects move, many potential targets co-occur, and an automated system can:
+The central question is not merely whether a camera can identify a flower, insect, animal, or other focal object. In natural scenes, camera motion, coherent foreground sway, shadows, illumination transients, occlusion, blur, lens contamination, and object clutter can create or hide observations before a target detector ever makes a decision.
 
-- miss a real interaction,
-- record a non-interaction as an interaction,
-- assign a visitor to the wrong target,
-- split one interaction into multiple events, or
-- merge multiple visitors into one event.
+This repository therefore asks:
 
-This repository is organised around the functions needed to measure, explain, and eventually correct those errors.
+> Can an autonomous edge camera recognise when and why its own observations are unreliable, preserve that uncertainty as data, and use it to adapt auditing and downstream ecological inference?
 
-## Core principle
+## Central inversion
 
-The unit of observation is a **target--actor interaction event**:
+```text
+Conventional target-first pipeline
+  detect target -> detect organism -> count event -> treat noise as nuisance
 
-> an actor enters, contacts, remains near, or accesses a researcher-defined target.
+Noise-first pipeline
+  characterise scene disturbance -> estimate observation risks
+  -> preserve uncertainty / prioritise audit -> optionally interpret targets
+```
 
-A target can be a flower, inflorescence, fruit, leaf, nest entrance, bait station, or another focal biological structure. Actor taxon identification is optional rather than required for the core event record.
+Flowers, insects, nests, fruits, leaves, camera-trap animals, and other focal entities are downstream applications. They are not the core methodological object.
+
+## Core outputs
+
+The primary output is an **observability record** for each frame or time window:
+
+```text
+noise source
+noise confidence
+false-event risk
+missed-event risk
+attribution-risk
+observability state
+whether high-resolution context should be retained
+whether an independent audit clip should be captured
+```
+
+A noisy interval is never silently dropped:
+
+```text
+clean          -> ordinary low-cost monitoring
+confounded     -> retain noise metadata
+high risk      -> prioritise audit and high-resolution context
+unobservable   -> retain the condition; do not force a biological conclusion
+unknown        -> preserve uncertainty and audit
+```
 
 ## Function-first architecture
 
 ```text
-1. target specification
-2. target localisation or tracking
-3. local coordinate stabilisation
-4. relative-motion candidate extraction
-5. interaction-zone state estimation
-6. event segmentation and adaptive recording
-7. random audit recording
-8. manual annotation and error taxonomy
-9. detection / attribution error modelling
-10. optional actor guild or taxon recognition
+1. scene-noise / observability measurement
+2. temporal motion and photometric features
+3. false-event / missed-event / attribution-risk estimation
+4. adaptive context and independent-audit recording
+5. noise-aware error modelling and calibration
+6. optional target specification and localisation
+7. optional event segmentation and interaction-zone states
+8. optional actor guild or taxon recognition
 ```
 
-The first nine functions are the core method. Flower detection, Cirsium-specific models, and three-class insect recognition are optional plugins retained as prototypes.
+Target and organism models are retained as optional ablations and applications. They must never turn a detection directly into an ecological claim.
 
 ## What is implemented now
 
-The reusable package provides the first, deliberately small backbone:
-
-- taxon-agnostic target, candidate, scene-state, event, and audit-record data contracts;
-- manual target and nested-zone specification;
-- local MOG2 motion extraction as a reproducible baseline;
-- target-relative motion primitives;
-- target assignment that retains ambiguous neighbouring targets rather than forcing a false certainty;
-- interaction-event segmentation and a pre-event ring buffer;
-- independent random audit sampling;
-- SQLite event ledger;
-- target/time-aware audit matching, error summaries, and condition-stratified observability summaries;
-- a runnable motion-only baseline CLI that writes the new ledger format;
-- a truth-labelled synthetic benchmark that stress-tests the method before fieldwork.
-
-The legacy scripts are retained as explicit ablation baselines:
-
-```text
-motion only
-motion -> detector
-motion -> classifier
-```
+- target-agnostic `NoiseObservation`, `NoiseSource`, `ObservabilityState`, and transparent risk policy;
+- IMX500 hardware adapter that records model role, ROI, outputs, and KPI metadata;
+- target-agnostic **NoiseBench** protocol generator for controlled perturbations;
+- target-relative motion primitives, event data contracts, audit sampling, SQLite ledger, and error-evaluation utilities;
+- legacy motion / detector / classifier scripts retained as explicit ablation baselines;
+- a previous interaction-level synthetic benchmark, now treated as a downstream stress test rather than the primary method.
 
 ## Repository map
 
-- `src/interaction_sensing/` — reusable package for targets, candidates, interaction events, audit capture, ledgers, simulation, and evaluation.
-- `analysis/` — audit matching and condition-specific observability analysis skeleton.
-- `configs/baselines/` — versioned settings for the historical ablation pipelines.
-- `legacy/` — original prototype scripts, now organised as runtime, target-detection, recognition, and data utilities.
-- `docs/PREFIELD_VALIDATION.md` — the claim ladder and pre-field benchmark protocol.
-- `docs/FUNCTION_INVENTORY.md` — current functions and their role in the new system.
-- `docs/ERROR_TAXONOMY.md` — error classes and minimum audit-annotation fields.
-- `docs/TARGET_ARCHITECTURE.md` — migration plan and target package layout.
+- `src/interaction_sensing/noise.py` — noise source, observability record, and transparent risk policy.
+- `src/interaction_sensing/noisebench/` — pre-recording manifest generation for target-agnostic controlled perturbation experiments.
+- `src/interaction_sensing/plugins/imx500.py` — optional IMX500 hardware / metadata adapter.
+- `src/interaction_sensing/` — reusable contracts for targets, candidates, events, audits, ledgers, simulation, and evaluation.
+- `docs/NOISE_FIRST_METHOD.md` — the conceptual framework.
+- `docs/NOISEBENCH_PROTOCOL.md` — controlled perturbation protocol and endpoints.
+- `docs/IMX500_DEPLOYMENT.md` — IMX500 as a scene-observability sensor.
+- `legacy/` — original prototype scripts, organised as runtime, target detection, recognition, and data utilities.
 
 ## Quick start
 
@@ -81,71 +90,59 @@ python -m pip install -e ".[runtime,analysis,dev]"
 pytest
 ```
 
-## Run the motion-only baseline
+## Build a NoiseBench recording plan
 
-Use a manually defined target box. The runner does not need flower or insect models.
-
-```bash
-interaction-motion-baseline \
-  --source path/to/video.mp4 \
-  --target-id flower_001 \
-  --target-type flower \
-  --target-bbox 420 180 720 520 \
-  --access-bbox 520 260 620 360 \
-  --ledger runs/motion_baseline/events.sqlite \
-  --clips-dir runs/motion_baseline/clips \
-  --write-clips \
-  --audit-probability 0.05 \
-  --audit-window-seconds 60
-```
-
-The output is not a biological conclusion yet. It is a structured record of:
-
-- target metadata;
-- motion-triggered candidate interaction events;
-- event clips, if requested;
-- random audit clips, if requested;
-- an SQLite ledger for later human truth matching and error analysis.
-
-## Run the pre-field synthetic benchmark
-
-The benchmark has complete ground truth and compares a fixed-context baseline
-against a target-relative, multi-target, ambiguity-preserving policy. It tests
-wind-driven target motion, neighbouring targets, pass-bys, shadows, tracker
-error, detection misses, and audit correction.
+NoiseBench needs no organism data. It creates a randomised, reproducible schedule for stable controls, camera shake, foreground/background motion, lighting changes, shadows, occlusion, blur, lens contamination, clutter, and mixed disturbances.
 
 ```bash
-# Fast smoke test
-interaction-sim-benchmark --quick --output-dir runs/synthetic_quick
-
-# Default factorial benchmark
-interaction-sim-benchmark --output-dir runs/synthetic_benchmark
+interaction-noisebench-plan \
+  --replicates 3 \
+  --duration-seconds 30 \
+  --frame-rate 15 \
+  --output-dir runs/noisebench_plan
 ```
 
-Every run writes:
+The output is created **before recording**:
 
 ```text
-scenario_metrics.csv    # replicate-level outcomes
-benchmark_summary.csv   # policy × scenario means
-benchmark_report.md     # human-readable result table
-assumptions.json        # complete simulation settings
+noisebench_manifest.csv  randomised recording order and perturbation truth
+noisebench_windows.csv   one-second truth windows for later matching
+noisebench_config.json   design assumptions and seed
+noisebench_protocol.md   operator-facing protocol
 ```
 
-A synthetic win is a **mechanistic result**, not field validation. The method
-is useful only when its predicted advantage persists under non-zero tracker
-error and later transfers to controlled and field video. See
-`docs/PREFIELD_VALIDATION.md` for the evidence ladder.
+See `docs/NOISEBENCH_PROTOCOL.md` for the experimental matrix and endpoints.
 
-## Research direction
+## IMX500 role
 
-The method will be evaluated by its ability to recover ecological interaction estimates, not only image-level accuracy. Key outputs include:
+The Raspberry Pi AI Camera is intended first as a low-power scene-noise / image-quality sensor:
 
-- event recall and false-event rate;
-- wrong-target attribution rate;
-- duplicate / merged-event rate;
-- how error changes with wind, light, target motion, target density, overlap, and background complexity;
-- whether corrected target-level interaction rates reproduce conclusions from continuous-video ground truth.
+```text
+stable scene
+photometric disturbance
+occlusion
+blur or focus loss
+lens contamination
+clutter / overlap
+unknown condition
+```
+
+The Pi supplements that with temporal features that one frame cannot resolve, such as global camera displacement and coherent foreground motion. Generic SSD models are only hardware/metadata smoke tests, not ecological detectors.
+
+## Downstream applications
+
+After NoiseBench establishes the observation process, target-specific tasks can test whether noise-aware sensing changes conclusions:
+
+```text
+object-zone entry
+flower--visitor recording
+nest entrance activity
+fruit or leaf use
+camera-trap species observations
+```
+
+The key endpoint is not classifier F1 alone. It is whether a noise-aware system better predicts and corrects false events, missed events, and attribution errors under finite storage and power.
 
 ## Status
 
-This is an active research prototype. The `feature/synthetic-observability-benchmark` branch adds the first pre-field benchmark for the core methodological claim; the default branch contains the runnable motion baseline and organised legacy layout.
+This is an active research prototype. The next empirical milestone is a hardware-in-the-loop NoiseBench dataset and a lightweight IMX500 noise-state model; no field ecological claim should be made before that calibration exists.
