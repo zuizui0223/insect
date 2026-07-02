@@ -25,6 +25,18 @@ class _Converter:
         return _Converted(*coords)
 
 
+class _BatchedTensor:
+    """Minimal NumPy-like batch wrapper used to test decoder logic off-device."""
+
+    ndim = 2
+
+    def __init__(self, batch):
+        self.batch = batch
+
+    def __getitem__(self, index):
+        return self.batch[index]
+
+
 def test_sensor_roi_clips_to_sensor_bounds() -> None:
     roi = SensorROI(4000, 3000, 200, 200).clipped((4056, 3040))
     assert roi.as_tuple() == (4000, 3000, 56, 40)
@@ -43,9 +55,9 @@ def test_ssd_decoder_converts_coords_filters_confidence_and_labels() -> None:
     decoder = SSDDetectionDecoder(confidence_threshold=0.5, labels={1: "actor_candidate"})
     detections = decoder.decode(
         outputs=[
-            [[(10.0, 20.0, 30.0, 40.0), (0.0, 0.0, 5.0, 5.0)]],
-            [[0.9, 0.2]],
-            [[1, 2]],
+            _BatchedTensor([[(10.0, 20.0, 30.0, 40.0), (0.0, 0.0, 5.0, 5.0)]]),
+            _BatchedTensor([[0.9, 0.2]]),
+            _BatchedTensor([[1, 2]]),
         ],
         metadata={"frame": 1},
         imx500=_Converter(),
