@@ -1,4 +1,4 @@
-"""Train and evaluate the lightweight temporal nuisance-risk model."""
+"""Train, evaluate, and quantify the temporal nuisance-risk model."""
 
 from __future__ import annotations
 
@@ -7,10 +7,13 @@ from pathlib import Path
 
 from interaction_sensing.simulation import (
     TemporalRiskBenchmarkConfig,
+    TemporalRiskEvaluationConfig,
     TemporalRiskModelConfig,
     VisualBenchmarkConfig,
+    evaluate_temporal_risk_results,
     run_temporal_risk_benchmark,
     write_temporal_risk_benchmark,
+    write_temporal_risk_evaluation,
 )
 
 
@@ -34,6 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--hidden-units", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=350)
     parser.add_argument("--learning-rate", type=float, default=0.04)
+    parser.add_argument("--bootstrap-resamples", type=int, default=2_000)
+    parser.add_argument("--recall-noninferiority-margin", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=20260702)
     parser.add_argument("--quick", action="store_true", help="Run a compact smoke-test grid")
     return parser
@@ -62,11 +67,24 @@ def main(argv: list[str] | None = None) -> int:
         model=model,
     )
     run = run_temporal_risk_benchmark(config)
-    outputs = write_temporal_risk_benchmark(args.output_dir, run, config)
-    for name, path in outputs.items():
+    benchmark_outputs = write_temporal_risk_benchmark(args.output_dir, run, config)
+    evaluation_config = TemporalRiskEvaluationConfig(
+        bootstrap_resamples=min(args.bootstrap_resamples, 300) if args.quick else args.bootstrap_resamples,
+        recall_noninferiority_margin=args.recall_noninferiority_margin,
+        seed=args.seed,
+    )
+    effects, failure_map = evaluate_temporal_risk_results(run.results, evaluation_config)
+    evaluation_outputs = write_temporal_risk_evaluation(
+        args.output_dir,
+        effects,
+        failure_map,
+        evaluation_config,
+    )
+    for name, path in {**benchmark_outputs, **evaluation_outputs}.items():
         print(f"{name}: {path}")
     print(f"held-out rows: {len(run.results)}")
     print(f"training samples: {run.training_summary.samples}")
+    print(f"failure-map cells: {len(failure_map)}")
     return 0
 
 
