@@ -1,12 +1,12 @@
-"""Sony IMX500 adapter for target-aware interaction sensing.
+"""Sony IMX500 adapter for noise-first ecological sensing.
 
-The IMX500 is used here as a *sensor-side candidate proposer*. It never turns a
-neural-network detection directly into a biological interaction. The host must
-still perform target attribution, zone-state estimation, event segmentation,
-and auditing.
+The IMX500 is used primarily as a *sensor-side scene-noise and observability
+monitor*. It should identify conditions that make later ecological measurement
+unreliable: shake, co-moving foreground, clutter, photometric transients,
+occlusion, image degradation, or unknown conditions.
 
-Hardware imports are intentionally lazy: this module can be unit-tested off
-Raspberry Pi and only requires Picamera2 on a deployed device.
+Object detections remain an optional compatibility feature. A neural-network
+object detection never directly establishes a biological interaction.
 """
 
 from __future__ import annotations
@@ -22,9 +22,10 @@ from interaction_sensing.domain import BBox, Candidate
 
 
 class ModelRole(str, Enum):
-    TARGET_PROPOSAL = "target_proposal"
-    ACTOR_PROPOSAL = "actor_proposal"
-    QUALITY_MONITOR = "quality_monitor"
+    NOISE_STATE = "noise_state"
+    OBSERVABILITY_QUALITY = "observability_quality"
+    SCENE_EMBEDDING = "scene_embedding"
+    OBJECT_PROPOSAL = "object_proposal"
     EXPERIMENTAL = "experimental"
 
 
@@ -74,6 +75,8 @@ class SensorROI:
 
 @dataclass(frozen=True, slots=True)
 class IMX500Detection:
+    """Optional object proposal, never a biological event by itself."""
+
     bbox: BBox
     category: int
     confidence: float
@@ -94,7 +97,7 @@ class IMX500Detection:
 
 @dataclass(frozen=True, slots=True)
 class IMX500InferenceRecord:
-    """Immutable sensor-side inference record, independent from event labels."""
+    """Immutable sensor-side record, independent from biological labels."""
 
     timestamp: datetime
     model_path: str
@@ -119,11 +122,11 @@ class IMX500InferenceRecord:
 
 
 def detections_as_candidates(record: IMX500InferenceRecord) -> list[Candidate]:
-    """Bridge sensor detections into the taxon-agnostic candidate layer.
+    """Optional bridge from object proposals into the generic candidate layer.
 
-    The returned objects are deliberately only `Candidate`s. They must still be
-    assigned to a target and evaluated against interaction zones before entering
-    an event state machine.
+    This is intentionally not used by the noise-first core. It exists only for
+    ablations in which object proposals are compared after scene observability
+    has already been measured.
     """
 
     return [
@@ -149,16 +152,16 @@ def detections_as_candidates(record: IMX500InferenceRecord) -> list[Candidate]:
 
 class InferenceDecoder(Protocol):
     def decode(self, outputs: Sequence[Any], metadata: Any, imx500: Any, picam2: Any) -> list[IMX500Detection]:
-        """Decode model-specific output tensors into ISP-output pixel boxes."""
+        """Decode model-specific outputs into optional coordinate-aware proposals."""
 
 
 @dataclass(slots=True)
 class SSDDetectionDecoder:
-    """Decoder for the common `(boxes, scores, classes)` IMX500 SSD layout.
+    """Optional decoder for common `(boxes, scores, classes)` IMX500 SSD output.
 
-    It mirrors the Raspberry Pi object-detection example. Custom models often
-    require a different decoder; do not force arbitrary output tensors through
-    this class.
+    It is retained solely to verify device metadata and to support object-model
+    ablations. Custom noise-state classifiers should use their own lightweight
+    decoder and write a `NoiseObservation` alongside the inference record.
     """
 
     confidence_threshold: float = 0.25
@@ -207,12 +210,12 @@ def _first_batch(value: Any) -> Any:
 
 @dataclass(slots=True)
 class TargetAwareROIController:
-    """Translate a target-context box into a safe IMX500 sensor ROI.
+    """Optional sensor ROI controller for controlled ablations.
 
-    This deliberately controls *where the sensor model looks*, not what the
-    model means. A future target tracker can call ``update_target_context`` only
-    when its confidence is adequate; weak tracking should retain the last known
-    ROI or emit an explicit uncertainty state at the runtime layer.
+    Core noise monitoring should normally inspect a fixed scene/context region,
+    because moving a crop to follow presumed targets can conceal the very
+    clutter and motion processes being measured. This controller remains for
+    later controlled comparisons, not as the default observation design.
     """
 
     sensor_size: tuple[int, int]
@@ -236,7 +239,7 @@ class TargetAwareROIController:
 
 
 class InferenceNDJSONLogger:
-    """Append complete sensor inference records for later audit and calibration."""
+    """Append complete sensor records for later noise and audit analysis."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -300,7 +303,7 @@ class IMX500Runtime:
             detections = self.decoder.decode(outputs, metadata, self.imx500, self.picam2)
             try:
                 kpi = dict(self.imx500.get_kpi_info(metadata) or {})
-            except Exception:  # device metadata variants should not discard inference
+            except Exception:
                 kpi = {}
             self._frame_index += 1
             return IMX500InferenceRecord(
