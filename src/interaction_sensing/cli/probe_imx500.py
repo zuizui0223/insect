@@ -1,8 +1,9 @@
-"""Run an IMX500 model as an auditable sensor-side proposal stream.
+"""Run an IMX500 model as an auditable scene-observability probe.
 
-This command is a hardware-in-the-loop probe. It does not claim that a detected
-object is an ecological interaction. It records every decoded sensor proposal
-so target attribution and manual audits can happen downstream.
+This command validates the hardware and records sensor-side outputs. It does
+not make an ecological observation. Generic SSD output is an optional firmware
+and metadata check; the first scientific model role is noise-state or
+observability-quality monitoring.
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--model-role",
         choices=[role.value for role in ModelRole],
         default=ModelRole.EXPERIMENTAL.value,
-        help="Semantic role in the sensing pipeline, not a biological conclusion",
+        help="Noise/quality/object role. This is a sensing role, never a biological conclusion.",
     )
     parser.add_argument(
         "--sensor-roi",
@@ -58,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         metavar=("LEFT", "TOP", "WIDTH", "HEIGHT"),
-        help="Optional absolute full-sensor crop used as IMX500 inference ROI",
+        help="Optional fixed full-sensor scene/context crop used as IMX500 inference ROI",
     )
     parser.add_argument("--sensor-width", type=int, default=4056)
     parser.add_argument("--sensor-height", type=int, default=3040)
@@ -91,8 +92,8 @@ def main(argv: list[str] | None = None) -> int:
             record = runtime.capture_inference(inference_roi=roi)
             logger.write(record)
             print(
-                f"frame={record.frame_index} detections={len(record.detections)} "
-                f"roi={None if roi is None else roi.as_tuple()}"
+                f"frame={record.frame_index} outputs={len(record.detections)} "
+                f"roi={None if roi is None else roi.as_tuple()} role={record.model_role.value}"
             )
             if args.interval_seconds:
                 time.sleep(args.interval_seconds)
