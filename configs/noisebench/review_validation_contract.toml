@@ -1,0 +1,70 @@
+# Freeze this file before tuning a NoiseBench model.
+# Changes require a new dated contract, never replacement of an old result.
+
+[scope]
+claim = "target-agnostic reference-guided noise cancellation and observability calibration"
+biological_claims_allowed = false
+primary_experimental_unit = "device x physical_scene x session x perturbation_schedule"
+
+[comparison]
+shared_input = "identical recorded low-cost stream"
+energy_budget_matched = true
+storage_budget_matched = true
+truth_windows_preregistered = true
+methods = [
+  "B0_fixed_interval",
+  "B1_motion_trigger",
+  "B2_global_stabilisation",
+  "N0_reference_guided_cancellation",
+  "N1_N0_plus_noise_state_model",
+  "N2_N1_plus_risk_guided_audit",
+]
+
+[primary_endpoint.false_event_reduction]
+name = "false_event_rate_at_matched_true_change_recall"
+direction = "lower_is_better"
+comparison = "N0,N1,N2 versus B1,B2"
+
+[primary_endpoint.risk_calibration]
+name = "observation_risk_calibration"
+metrics = ["brier_score", "expected_calibration_error", "high_risk_average_precision", "false_reassurance_rate"]
+direction = "lower_brier_ece_false_reassurance; higher_average_precision"
+comparison = "N1,N2 versus global_motion_or_confidence_threshold"
+
+[primary_endpoint.audit_efficiency]
+name = "verified_failure_yield_at_fixed_budget"
+metrics = ["verified_failure_windows_per_GB", "verified_failure_windows_per_Wh", "unobservable_window_recall"]
+direction = "higher_is_better"
+comparison = "N2 versus uniform_audit,event_only_audit"
+
+[inference]
+report = ["effect_size", "95_percent_interval", "condition_stratified_estimates"]
+resampling = "paired_hierarchical_bootstrap_or_blocked_permutation"
+frame_level_p_values_accepted = false
+mixed_model = "endpoint ~ method * noise_family * intensity + (1|device) + (1|physical_scene) + (1|session)"
+
+[locked_test]
+hold_out_whole_physical_scene = true
+hold_out_whole_session_day = true
+hold_out_at_least_one_mixed_noise_condition = true
+hold_out_at_least_one_outdoor_location = true
+threshold_tuning_on_locked_test = false
+
+[negative_controls]
+required = [
+  "time_shifted_reference",
+  "spatially_mismatched_reference",
+  "reference_with_injected_error",
+  "noise_source_absent",
+]
+
+[operational_feasibility]
+required = [
+  "end_to_end_latency",
+  "inference_throughput",
+  "Wh_per_recording_hour",
+  "storage_per_recording_hour",
+  "thermal_stability",
+  "crash_recovery_rate",
+  "continuous_operation_duration",
+]
