@@ -1,7 +1,7 @@
 import pytest
 
 from interaction_sensing.evaluation import fit_audit_calibration
-from interaction_sensing.simulation import BenchmarkConfig, run_benchmark
+from interaction_sensing.simulation import BenchmarkConfig, run_benchmark, write_benchmark
 from interaction_sensing.sensing import relative_motion_magnitude
 
 
@@ -60,3 +60,18 @@ def test_audit_calibration_recovers_binary_truth_count() -> None:
     assert calibration.detection_probability == pytest.approx(0.8)
     assert calibration.false_positive_probability == pytest.approx(0.1)
     assert estimate == pytest.approx(40.0)
+
+
+def test_benchmark_writes_reproducible_outputs(tmp_path) -> None:
+    config = BenchmarkConfig(
+        frames=80,
+        replicates=1,
+        wind_amplitudes=(0.0,),
+        neighbour_distances=(120.0,),
+        tracker_error_sds=(0.0,),
+        seed=99,
+        audit_probability=0.5,
+    )
+    outputs = write_benchmark(tmp_path, run_benchmark(config), config)
+    assert all(path.exists() for path in outputs.values())
+    assert "Synthetic observability benchmark" in outputs["report"].read_text(encoding="utf-8")
