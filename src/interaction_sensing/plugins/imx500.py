@@ -168,23 +168,23 @@ class SSDDetectionDecoder:
     labels: dict[int, str] = field(default_factory=dict)
 
     def decode(self, outputs: Sequence[Any], metadata: Any, imx500: Any, picam2: Any) -> list[IMX500Detection]:
-        if len(outputs) < 3:
+        if outputs is None or len(outputs) < 3:
             raise ValueError("SSD decoder expects boxes, scores, and classes outputs")
-        boxes = _first_batch(outputs[0])
-        scores = _first_batch(outputs[1])
-        classes = _first_batch(outputs[2])
+        # Picamera2 IMX500.get_outputs(add_batch=False) returns boxes (N, 4),
+        # scores (N,) and classes (N,) with no batch axis. add_batch=True adds a
+        # leading singleton axis; strip it only when it is genuinely present.
+        boxes = _strip_batch(outputs[0], expected_ndim=2)
+        scores = _strip_batch(outputs[1], expected_ndim=1)
+        classes = _strip_batch(outputs[2], expected_ndim=1)
         detections: list[IMX500Detection] = []
         for coords, score, category in zip(boxes, scores, classes):
             confidence = float(score)
             if confidence < self.confidence_threshold:
                 continue
-            converted = imx500.convert_inference_coords(coords, metadata, picam2)
-            bbox = BBox(
-                float(converted.x),
-                float(converted.y),
-                float(converted.x + converted.width),
-                float(converted.y + converted.height),
-            )
+            # convert_inference_coords returns a (x, y, width, height) tuple in
+            # output-image pixels.
+            x, y, width, height = imx500.convert_inference_coords(coords, metadata, picam2)
+            bbox = BBox(float(x), float(y), float(x) + float(width), float(y) + float(height))
             category_id = int(category)
             detections.append(
                 IMX500Detection(
@@ -197,14 +197,21 @@ class SSDDetectionDecoder:
         return detections
 
 
-def _first_batch(value: Any) -> Any:
-    """Unwrap an optional leading batch axis without requiring NumPy."""
+def _strip_batch(value: Any, *, expected_ndim: int) -> Any:
+    """Remove a leading singleton batch axis if one is present.
 
-    try:
-        if getattr(value, "ndim", 0) >= 2:
-            return value[0]
-    except (IndexError, TypeError):
-        pass
+    ``expected_ndim`` is the shape rank the tensor should have without a batch
+    axis (2 for ``(N, 4)`` boxes, 1 for ``(N,)`` scores/classes). Only a leading
+    axis of length 1 is stripped, so a real detection count of 1 is preserved.
+    """
+
+    ndim = getattr(value, "ndim", None)
+    if ndim == expected_ndim + 1:
+        try:
+            if value.shape[0] == 1:
+                return value[0]
+        except (IndexError, AttributeError, TypeError):
+            pass
     return value
 
 
@@ -300,7 +307,17 @@ class IMX500Runtime:
         try:
             metadata = request.get_metadata()
             outputs = self.imx500.get_outputs(metadata)
-            detections = self.decoder.decode(outputs, metadata, self.imx500, self.picam2)
+            # On real hardware get_outputs() returns None while the network
+            # firmware is still uploading (first frames) and intermittently
+            # when a frame carries no inference tensor. That is a valid
+            # observation about the sensor, not an error: record the frame with
+            # no detections rather than crashing the decoder.
+            inference_available = outputs is not None
+            detections = (
+                self.decoder.decode(outputs, metadata, self.imx500, self.picam2)
+                if inference_available
+                else []
+            )
             try:
                 kpi = dict(self.imx500.get_kpi_info(metadata) or {})
             except Exception:
@@ -314,6 +331,7 @@ class IMX500Runtime:
                 detections=tuple(detections),
                 frame_index=self._frame_index,
                 kpi=kpi,
+                metadata={"inference_available": inference_available},
             )
         finally:
             request.release()
